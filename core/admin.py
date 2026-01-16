@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.db import models
 from datetime import timedelta
+from adminsortable2.admin import SortableAdminMixin
 from .models import Persona, Consorzio, Ramo, Giro, Turno, TurnoProprietario
 
 
@@ -127,15 +128,17 @@ class GiroAdmin(admin.ModelAdmin):
 # TURNO ADMIN
 # =======================
 @admin.register(Turno)
-class TurnoAdmin(admin.ModelAdmin):
+class TurnoAdmin(SortableAdminMixin, admin.ModelAdmin):
     list_display = ('ordine', 'get_giro_completo', 'utilizzatore', 'durata')
     list_display_links = ('get_giro_completo', 'utilizzatore')
     list_filter = ('giro__ramo__consorzio', 'giro__ramo', 'giro')
     search_fields = ('utilizzatore__nome', 'utilizzatore__cognome')
     autocomplete_fields = ['utilizzatore']
     list_per_page = 100
-    list_editable = ('ordine',)
     inlines = [TurnoProprietarioInline]
+    
+    # Specifica il campo da usare per l'ordinamento
+    ordering = ['ordine']
     
     fieldsets = (
         ('Informazioni Principali', {
@@ -153,13 +156,31 @@ class TurnoAdmin(admin.ModelAdmin):
     get_giro_completo.short_description = 'Giro'
     get_giro_completo.admin_order_field = 'giro'
     
-    # def durata_hhmm(self, obj):
-    #     hours, remainder = divmod(obj.durata.total_seconds(), 3600)
-    #     minutes = remainder // 60
-    #     return f"{int(hours):02d}:{int(minutes):02d}"
-    # durata_hhmm.short_description = 'Durata calcolata (hh:mm)'
-    
-    
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.select_related('utilizzatore', 'giro__ramo__consorzio')
+        qs = qs.select_related('utilizzatore', 'giro__ramo__consorzio')
+        
+        # Forza la visualizzazione solo se è selezionato un giro specifico
+        giro_id = request.GET.get('giro__id__exact')
+        
+        if not giro_id:
+            # Se non c'è un giro selezionato, restituisci queryset vuoto
+            from django.contrib import messages
+            messages.warning(request, 'Seleziona un Giro dal filtro per visualizzare i turni.')
+            return qs.none()
+        
+        return qs
+    
+    def changelist_view(self, request, extra_context=None):
+        """Mostra un messaggio se non è selezionato un giro"""
+        extra_context = extra_context or {}
+        
+        giro_id = request.GET.get('giro__id__exact')
+        if giro_id:
+            try:
+                giro = Giro.objects.select_related('ramo__consorzio').get(pk=giro_id)
+                extra_context['giro_selezionato'] = giro
+            except Giro.DoesNotExist:
+                pass
+        
+        return super().changelist_view(request, extra_context)
