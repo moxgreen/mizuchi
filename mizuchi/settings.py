@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Third party apps
+    'adminsortable2',
     'whitenoise.runserver_nostatic',
     # Local apps
     'core',
