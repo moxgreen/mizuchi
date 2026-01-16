@@ -2,6 +2,7 @@ import logging
 from django.db import models
 from django.core.exceptions import ValidationError
 from datetime import timedelta
+from .fields import DurationHHMMField
 
 # Create your models here.
 class Persona(models.Model):
@@ -62,7 +63,7 @@ class Giro(models.Model):
 class Turno(models.Model):
     utilizzatore = models.ForeignKey(Persona, on_delete=models.CASCADE, related_name='turni_utilizzatore')
     proprietari = models.ManyToManyField(Persona, related_name='turni_proprietario', through='TurnoProprietario')
-    durata = models.DurationField(editable=False, default=timedelta(0))
+    durata = DurationHHMMField(editable=False, default=timedelta(0))
     ordine = models.IntegerField()
     giro = models.ForeignKey(Giro, on_delete=models.CASCADE, related_name='turni')
 
@@ -99,7 +100,7 @@ class TurnoProprietario(models.Model):
     """Modello intermediario per gestire il tempo allocato a ciascun proprietario in un turno"""
     turno = models.ForeignKey(Turno, on_delete=models.CASCADE)
     proprietario = models.ForeignKey(Persona, on_delete=models.CASCADE)
-    tempo = models.DurationField(
+    tempo = DurationHHMMField(
         help_text="Tempo allocato a questo proprietario (hh:mm)"
     )
     

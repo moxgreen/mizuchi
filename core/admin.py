@@ -128,7 +128,7 @@ class GiroAdmin(admin.ModelAdmin):
 # =======================
 @admin.register(Turno)
 class TurnoAdmin(admin.ModelAdmin):
-    list_display = ('ordine', 'get_giro_completo', 'utilizzatore', 'durata_hhmm')
+    list_display = ('ordine', 'get_giro_completo', 'utilizzatore', 'durata')
     list_display_links = ('get_giro_completo', 'utilizzatore')
     list_filter = ('giro__ramo__consorzio', 'giro__ramo', 'giro')
     search_fields = ('utilizzatore__nome', 'utilizzatore__cognome')
@@ -142,22 +142,22 @@ class TurnoAdmin(admin.ModelAdmin):
             'fields': ('giro', 'ordine', 'utilizzatore')
         }),
         ('Durata', {
-            'fields': ('durata_hhmm',)
+            'fields': ('durata',)
         }),
     )
     
-    readonly_fields = ('durata_hhmm',)
+    readonly_fields = ('durata',)
     
     def get_giro_completo(self, obj):
         return str(obj.giro)
     get_giro_completo.short_description = 'Giro'
     get_giro_completo.admin_order_field = 'giro'
     
-    def durata_hhmm(self, obj):
-        hours, remainder = divmod(obj.durata.total_seconds(), 3600)
-        minutes = remainder // 60
-        return f"{int(hours):02d}:{int(minutes):02d}"
-    durata_hhmm.short_description = 'Durata calcolata (hh:mm)'
+    # def durata_hhmm(self, obj):
+    #     hours, remainder = divmod(obj.durata.total_seconds(), 3600)
+    #     minutes = remainder // 60
+    #     return f"{int(hours):02d}:{int(minutes):02d}"
+    # durata_hhmm.short_description = 'Durata calcolata (hh:mm)'
     
     
     def get_queryset(self, request):
