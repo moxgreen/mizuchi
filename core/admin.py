@@ -149,7 +149,7 @@ class TurnoAdmin(SortableAdminMixin, admin.ModelAdmin):
         }),
     )
     
-    readonly_fields = ('durata',)
+    readonly_fields = ('durata', 'ordine')
     
     def get_giro_completo(self, obj):
         return str(obj.giro)
