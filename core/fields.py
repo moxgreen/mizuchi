@@ -4,6 +4,26 @@ from datetime import timedelta
 import re
 
 
+def format_duration_hhmm(duration):
+    """Formatta un timedelta come hh:mm"""
+    if duration is None:
+        return "00:00"
+    total_seconds = int(duration.total_seconds())
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    return f"{hours:02d}:{minutes:02d}"
+
+
+class DurationHHMM(timedelta):
+    """Sottoclasse di timedelta che mostra sempre il formato hh:mm"""
+    
+    def __str__(self):
+        return format_duration_hhmm(self)
+    
+    def __repr__(self):
+        return f"DurationHHMM({format_duration_hhmm(self)})"
+
+
 class DurationHHMMWidget(forms.TextInput):
     """Widget per DurationField che mostra e accetta solo il formato hh:mm"""
     
@@ -19,10 +39,7 @@ class DurationHHMMWidget(forms.TextInput):
         if isinstance(value, str):
             return value
         if isinstance(value, timedelta):
-            total_seconds = int(value.total_seconds())
-            hours = total_seconds // 3600
-            minutes = (total_seconds % 3600) // 60
-            return f"{hours:02d}:{minutes:02d}"
+            return format_duration_hhmm(value)
         return value
 
 
@@ -34,7 +51,7 @@ class DurationHHMMFormField(forms.DurationField):
         if value in (None, ''):
             return None
         if isinstance(value, timedelta):
-            return value
+            return DurationHHMM(seconds=value.total_seconds())
         
         # Pattern per hh:mm (ore possono essere più di 24)
         pattern = r'^(\d+):([0-5]?\d)$'
@@ -47,20 +64,17 @@ class DurationHHMMFormField(forms.DurationField):
         
         hours = int(match.group(1))
         minutes = int(match.group(2))
-        return timedelta(hours=hours, minutes=minutes)
+        return DurationHHMM(hours=hours, minutes=minutes)
     
     def prepare_value(self, value):
         if isinstance(value, timedelta):
-            total_seconds = int(value.total_seconds())
-            hours = total_seconds // 3600
-            minutes = (total_seconds % 3600) // 60
-            return f"{hours:02d}:{minutes:02d}"
+            return format_duration_hhmm(value)
         return value
 
 
 class DurationHHMMField(models.DurationField):
     """
-    DurationField che nell'admin mostra il formato hh:mm invece di [DD] [HH:[MM:]]ss[.uuuuuu]
+    DurationField che mostra sempre il formato hh:mm invece di [DD] [HH:[MM:]]ss[.uuuuuu]
     
     Internamente è un normale DurationField, quindi supporta tutta l'aritmetica
     con date, datetime e altre durate.
@@ -70,3 +84,30 @@ class DurationHHMMField(models.DurationField):
         defaults = {'form_class': DurationHHMMFormField}
         defaults.update(kwargs)
         return super().formfield(**defaults)
+    
+    def from_db_value(self, value, expression, connection):
+        """Converte il valore dal DB in DurationHHMM"""
+        if value is None:
+            return None
+        if isinstance(value, timedelta):
+            return DurationHHMM(seconds=value.total_seconds())
+        return value
+    
+    def to_python(self, value):
+        """Converte qualsiasi valore in DurationHHMM"""
+        if value is None:
+            return None
+        if isinstance(value, DurationHHMM):
+            return value
+        if isinstance(value, timedelta):
+            return DurationHHMM(seconds=value.total_seconds())
+        # Delega al parent per parsing stringhe standard
+        parsed = super().to_python(value)
+        if parsed is not None:
+            return DurationHHMM(seconds=parsed.total_seconds())
+        return None
+    
+    def value_to_string(self, obj):
+        """Per serializzazione"""
+        value = self.value_from_object(obj)
+        return format_duration_hhmm(value)
