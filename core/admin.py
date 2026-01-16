@@ -1,10 +1,8 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from adminsortable2.admin import SortableAdminMixin, SortableInlineAdminMixin, SortableAdminBase
-import csv
-from django.http import HttpResponse
+from django.db import models
 from datetime import timedelta
-from .models import Persona, Consorzio, Ramo, Giro, Turno
+from .models import Persona, Consorzio, Ramo, Giro, Turno, TurnoProprietario
 
 
 # =======================
@@ -37,19 +35,12 @@ class GiroInline(admin.TabularInline):
     ordering = ['ordine']
 
 
-class TurnoInline(SortableInlineAdminMixin, admin.TabularInline):
-    model = Turno
+class TurnoProprietarioInline(admin.TabularInline):
+    model = TurnoProprietario
     extra = 1
-    fields = ('ordine', 'utilizzatore', 'durata', 'proprietari')
-    #readonly_fields = ('get_proprietari_display',)
-    ordering = ['ordine']
-    autocomplete_fields = ['utilizzatore']
+    fields = ('proprietario', 'tempo')
+    autocomplete_fields = ['proprietario']
     
-    def get_proprietari_display(self, obj):
-        if obj.pk:
-            return ", ".join([str(p) for p in obj.proprietari.all()])
-        return "-"
-    get_proprietari_display.short_description = 'Proprietari'
 
 
 # =======================
@@ -99,11 +90,11 @@ class RamoAdmin(admin.ModelAdmin):
 # GIRO ADMIN
 # =======================
 @admin.register(Giro)
-class GiroAdmin(SortableAdminBase, admin.ModelAdmin):
+class GiroAdmin(admin.ModelAdmin):
     list_display = ('nome', 'ordine', 'get_ramo', 'get_consorzio', 'num_turni', 'durata_totale')
     list_filter = ('ramo__consorzio', 'ramo')
     search_fields = ('nome', 'ramo__nome', 'ramo__consorzio__nome')
-    inlines = [TurnoInline]
+    inlines = []
     ordering = ('ramo__consorzio', 'ramo', 'nome')
     
     def get_ramo(self, obj):
@@ -135,76 +126,27 @@ class GiroAdmin(SortableAdminBase, admin.ModelAdmin):
 # =======================
 # TURNO ADMIN
 # =======================
-def esporta_programmazione_ramo(modeladmin, request, queryset):
-    """
-    Esporta la programmazione dei turni per ramo in formato CSV.
-    Include ordine, utilizzatore, durata, e proprietari.
-    """
-    # Raggruppa turni per ramo
-    rami_turni = {}
-    for turno in queryset.select_related('utilizzatore', 'giro__ramo__consorzio').prefetch_related('proprietari'):
-        ramo = turno.giro.ramo
-        key = f"{ramo.consorzio.nome} - {ramo.nome}"
-        if key not in rami_turni:
-            rami_turni[key] = []
-        rami_turni[key].append(turno)
-    
-    # Crea il file CSV
-    response = HttpResponse(content_type='text/csv; charset=utf-8')
-    response['Content-Disposition'] = 'attachment; filename="programmazione_turni.csv"'
-    response.write('\ufeff')  # BOM per Excel UTF-8
-    
-    writer = csv.writer(response)
-    writer.writerow(['Consorzio - Ramo', 'Giro', 'Ordine', 'Utilizzatore', 'Durata (hh:mm)', 'Proprietari'])
-    
-    for ramo_nome, turni in sorted(rami_turni.items()):
-        # Ordina turni per giro e ordine
-        turni_ordinati = sorted(turni, key=lambda t: (t.giro.ordine, t.ordine))
-        for turno in turni_ordinati:
-            hours, remainder = divmod(turno.durata.total_seconds(), 3600)
-            minutes = remainder // 60
-            durata_str = f"{int(hours):02d}:{int(minutes):02d}"
-            proprietari_str = ", ".join([str(p) for p in turno.proprietari.all()])
-            
-            writer.writerow([
-                ramo_nome,
-                turno.giro.nome,
-                turno.ordine,
-                str(turno.utilizzatore),
-                durata_str,
-                proprietari_str
-            ])
-    
-    return response
-
-esporta_programmazione_ramo.short_description = "Esporta programmazione per ramo (CSV)"
-
-
 @admin.register(Turno)
-class TurnoAdmin(SortableAdminMixin, admin.ModelAdmin):
-    list_display = ('ordine', 'get_giro_completo', 'utilizzatore', 'durata_hhmm', 'get_proprietari_list')
+class TurnoAdmin(admin.ModelAdmin):
+    list_display = ('ordine', 'get_giro_completo', 'utilizzatore', 'durata_hhmm')
     list_display_links = ('get_giro_completo', 'utilizzatore')
     list_filter = ('giro__ramo__consorzio', 'giro__ramo', 'giro')
-    search_fields = ('utilizzatore__nome', 'utilizzatore__cognome', 'proprietari__nome', 'proprietari__cognome')
-    autocomplete_fields = ['utilizzatore', 'proprietari']
-    filter_horizontal = ('proprietari',)
+    search_fields = ('utilizzatore__nome', 'utilizzatore__cognome')
+    autocomplete_fields = ['utilizzatore']
     list_per_page = 100
     list_editable = ('ordine',)
-    actions = [esporta_programmazione_ramo]
+    inlines = [TurnoProprietarioInline]
     
     fieldsets = (
         ('Informazioni Principali', {
             'fields': ('giro', 'ordine', 'utilizzatore')
         }),
         ('Durata', {
-            'fields': ('durata', 'durata_hhmm_display')
-        }),
-        ('Proprietari', {
-            'fields': ('proprietari',)
+            'fields': ('durata_hhmm',)
         }),
     )
     
-    readonly_fields = ('durata_hhmm_display',)
+    readonly_fields = ('durata_hhmm',)
     
     def get_giro_completo(self, obj):
         return str(obj.giro)
@@ -215,29 +157,9 @@ class TurnoAdmin(SortableAdminMixin, admin.ModelAdmin):
         hours, remainder = divmod(obj.durata.total_seconds(), 3600)
         minutes = remainder // 60
         return f"{int(hours):02d}:{int(minutes):02d}"
-    durata_hhmm.short_description = 'Durata (hh:mm)'
+    durata_hhmm.short_description = 'Durata calcolata (hh:mm)'
     
-    def durata_hhmm_display(self, obj):
-        if obj.pk:
-            hours, remainder = divmod(obj.durata.total_seconds(), 3600)
-            minutes = remainder // 60
-            return format_html('<strong>{:02d}:{:02d}</strong>', int(hours), int(minutes))
-        return "-"
-    durata_hhmm_display.short_description = 'Durata Visualizzata (hh:mm)'
-    
-    def get_proprietari_list(self, obj):
-        if obj.pk:
-            proprietari = list(obj.proprietari.all()[:3])
-            if len(proprietari) == 0:
-                return "-"
-            display = ", ".join([str(p) for p in proprietari])
-            total = obj.proprietari.count()
-            if total > 3:
-                display += f" (+ altri {total - 3})"
-            return display
-        return "-"
-    get_proprietari_list.short_description = 'Proprietari'
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.select_related('utilizzatore', 'giro__ramo__consorzio').prefetch_related('proprietari')
+        return qs.select_related('utilizzatore', 'giro__ramo__consorzio')
