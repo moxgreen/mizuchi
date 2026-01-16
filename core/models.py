@@ -4,9 +4,9 @@ from django.db import models
 class Persona(models.Model):
     nome = models.CharField(max_length=100)
     cognome = models.CharField(max_length=100)
-    telefono = models.CharField(max_length=15)
-    email = models.EmailField(unique=True)
-    indirizzo = models.CharField(max_length=255)
+    telefono = models.CharField(max_length=15, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    indirizzo = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         verbose_name_plural = "Persone"
