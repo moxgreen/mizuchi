@@ -3,6 +3,7 @@ from django.utils.html import format_html
 from django.db import models
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.contrib.admin.views.main import ChangeList
 from datetime import timedelta
 from adminsortable2.admin import SortableAdminMixin
 from .models import Persona, Consorzio, Ramo, Giro, Turno, TurnoProprietario
@@ -162,20 +163,6 @@ class TurnoAdmin(SortableAdminMixin, admin.ModelAdmin):
         qs = qs.select_related('utilizzatore', 'giro__ramo__consorzio')
         return qs
     
-    def get_changelist_queryset(self, request):
-        """Filtra il queryset solo nella changelist"""
-        qs = self.get_queryset(request)
-        
-        # Forza la visualizzazione solo se è selezionato un giro specifico
-        giro_id = request.GET.get('giro__id__exact')
-        
-        if not giro_id:
-            from django.contrib import messages
-            messages.warning(request, 'Seleziona un Giro dal filtro per visualizzare i turni.')
-            return qs.none()
-        
-        return qs
-    
     def changelist_view(self, request, extra_context=None):
         """Mostra un messaggio se non è selezionato un giro"""
         extra_context = extra_context or {}
@@ -185,18 +172,17 @@ class TurnoAdmin(SortableAdminMixin, admin.ModelAdmin):
             try:
                 giro = Giro.objects.select_related('ramo__consorzio').get(pk=giro_id)
                 extra_context['giro_selezionato'] = giro
+                extra_context['title'] = f'Turni - {giro}'
             except Giro.DoesNotExist:
                 pass
+        else:
+            extra_context['title'] = 'Turni - Seleziona un Giro'
         
         # Applica il filtro al queryset per la changelist
         self.request = request
         return super().changelist_view(request, extra_context)
     
-    def get_changelist(self, request, **kwargs):
-        from django.contrib.admin.views.main import ChangeList
-        
-        outer_self = self
-        
+    def get_changelist(self, request, **kwargs):        
         class FilteredChangeList(ChangeList):
             def get_queryset(self, request):
                 qs = super().get_queryset(request)
