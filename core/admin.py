@@ -1,10 +1,11 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.db import models
+from django.shortcuts import redirect
+from django.urls import reverse
 from datetime import timedelta
 from adminsortable2.admin import SortableAdminMixin
 from .models import Persona, Consorzio, Ramo, Giro, Turno, TurnoProprietario
-
 
 # =======================
 # PERSONA ADMIN
@@ -159,12 +160,16 @@ class TurnoAdmin(SortableAdminMixin, admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         qs = qs.select_related('utilizzatore', 'giro__ramo__consorzio')
+        return qs
+    
+    def get_changelist_queryset(self, request):
+        """Filtra il queryset solo nella changelist"""
+        qs = self.get_queryset(request)
         
         # Forza la visualizzazione solo se è selezionato un giro specifico
         giro_id = request.GET.get('giro__id__exact')
         
         if not giro_id:
-            # Se non c'è un giro selezionato, restituisci queryset vuoto
             from django.contrib import messages
             messages.warning(request, 'Seleziona un Giro dal filtro per visualizzare i turni.')
             return qs.none()
@@ -183,4 +188,37 @@ class TurnoAdmin(SortableAdminMixin, admin.ModelAdmin):
             except Giro.DoesNotExist:
                 pass
         
+        # Applica il filtro al queryset per la changelist
+        self.request = request
         return super().changelist_view(request, extra_context)
+    
+    def get_changelist(self, request, **kwargs):
+        from django.contrib.admin.views.main import ChangeList
+        
+        outer_self = self
+        
+        class FilteredChangeList(ChangeList):
+            def get_queryset(self, request):
+                qs = super().get_queryset(request)
+                giro_id = request.GET.get('giro__id__exact')
+                if not giro_id:
+                    return qs.none()
+                return qs
+        
+        return FilteredChangeList
+    
+    def response_add(self, request, obj, post_url_continue=None):
+        """Preserva il filtro del giro dopo l'aggiunta"""
+        response = super().response_add(request, obj, post_url_continue)
+        if '_addanother' not in request.POST and '_continue' not in request.POST:
+            changelist_url = reverse('admin:core_turno_changelist')
+            return redirect(f"{changelist_url}?giro__id__exact={obj.giro.id}")
+        return response
+    
+    def response_change(self, request, obj):
+        """Preserva il filtro del giro dopo la modifica"""
+        response = super().response_change(request, obj)
+        if '_continue' not in request.POST and '_addanother' not in request.POST:
+            changelist_url = reverse('admin:core_turno_changelist')
+            return redirect(f"{changelist_url}?giro__id__exact={obj.giro.id}")
+        return response
