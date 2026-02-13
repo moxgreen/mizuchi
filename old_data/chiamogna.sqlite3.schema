@@ -1,0 +1,33 @@
+CREATE TABLE IF NOT EXISTS "giro" (
+  "id" INTEGER NOT NULL,
+  "ramo_bealera" TEXT NOT NULL DEFAULT 'BOSCHETTO',
+  "tipo_giro" TEXT NOT NULL DEFAULT 'A',
+  "ordine" INTEGER NOT NULL DEFAULT '0',
+  "id_utilizzatore" INTEGER NOT NULL DEFAULT '0',
+  "int_tempo" time NOT NULL DEFAULT '00:00:00',
+  PRIMARY KEY ("id")
+);
+CREATE TABLE IF NOT EXISTS "persona" (
+  "id" INTEGER NOT NULL,
+  "nome" text NOT NULL,
+  UNIQUE ("id")
+);
+CREATE TABLE IF NOT EXISTS "ruolo" (
+  "id" INTEGER NOT NULL,
+  "id_giro" INTEGER NOT NULL DEFAULT '0',
+  "id_utilizzatore" INTEGER NOT NULL DEFAULT '0',
+  "id_utente" INTEGER NOT NULL DEFAULT '0',
+  "intervallo_tempo" time NOT NULL DEFAULT '00:00:00',
+  "ramo_bealera" TEXT NOT NULL DEFAULT 'BOSCHETTO',
+  PRIMARY KEY ("id")
+);
+CREATE TABLE IF NOT EXISTS "utente" (
+  "id" INTEGER NOT NULL,
+  "id_persona" INTEGER NOT NULL DEFAULT '0',
+  PRIMARY KEY ("id")
+);
+CREATE TABLE IF NOT EXISTS "utilizzatore" (
+  "id" INTEGER NOT NULL,
+  "id_persona" INTEGER NOT NULL DEFAULT '0',
+  PRIMARY KEY ("id")
+);

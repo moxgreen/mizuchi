@@ -1,0 +1,22 @@
+Reset enabled: deleting existing core data...
+Import completed.
+Imported counts:
+- Persona: 370
+- Consorzio: 1
+- Ramo: 5
+- Giro: 10
+- Turno: 459
+- TurnoProprietario: 496
+Warnings/skips:
+- Missing utilizzatore persona: 0
+- Missing giro key: 0
+- Missing imported turno: 0
+- Missing proprietario persona: 0
+- Duplicate ordini remapped: 4
+- Duplicate ordine examples:
+  - legacy_giro_id=868 (SANTANTONIO/A): 120->121
+  - legacy_giro_id=1016 (SANTANTONIO/B): 30->31
+  - legacy_giro_id=1084 (CAPPELLA/A): 610->611
+  - legacy_giro_id=1210 (VARDA/B): 40->41
+- Turni without proprietario: 0
+- Turni with durata mismatch: 0
